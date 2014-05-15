@@ -1,0 +1,328 @@
+xts : the awesome timeseries class
+========================================================
+author: Chinmay Patil
+date: 14 May 2014
+incremental: true
+transition : none
+css : custom.css
+
+Structure of xts
+========================================================
+
+`xts` is an extended `zoo` class
+
+The 3 main components of `xts` objects are
+- **coredata** : a matrix
+- **index** : a vector of any of `Date`, `POSIXct`, `chron`, `yearmon`, `yearqtr` or `timeDate` clasess
+- **xtsAttributes** : Arbitrary attributes that may be assigned and removed from the object without causing issues with the data's display or otherwise.
+
+Let's load up some sample data
+========================================================
+
+```{r}
+require(xts)
+data(sample_matrix)
+class(sample_matrix)
+str(sample_matrix)
+```
+
+sample data
+========
+```{r}
+head(sample_matrix, 3)
+tail(sample_matrix, 3)
+
+```
+
+
+Converting to xts : as.xts function
+========================================================
+Most common usage.
+```
+as.xts(x, order.by)
+```
+
+**x** : a numeric vector, matrix or a factor.
+
+**order.by** : an index vector with unique entries by which the observations in x are ordered. 
+
+
+
+Converting matrix to xts
+========================================================
+
+```{r}
+matrix_xts <- as.xts(sample_matrix,dateFormat='Date')
+
+str(matrix_xts)
+```
+
+Converting data.frame to xts
+========================================================
+```{r}
+df_xts <- as.xts(as.data.frame(sample_matrix),
+       important='very important info!')
+
+str(df_xts)
+
+```
+
+Creating xts object from scratch
+========================================================
+```
+xts(x = NULL,
+    order.by = index(x),
+    frequency = NULL,
+    unique = TRUE,
+    tzone = Sys.getenv("TZ"),
+    ...)
+```
+```{r}
+xts(1:5, Sys.Date()+1:5)
+```
+
+The best feature of xts : subsetting
+========================================================
+type: section
+
+Lets create equivalent data.frame for comparison
+========================================================
+```{r}
+DF <- as.data.frame(sample_matrix)
+row.names(DF) <- NULL
+DF$index <- as.Date(row.names(sample_matrix))
+head(DF)
+```
+
+
+E.g. Extract entire month of March 2007 in data.frame
+========================================================
+```{r}
+res <- DF[DF$index >= as.Date('2007-03-01') &  DF$index <= as.Date('2007-03-31') , ]
+head(res, 3)
+tail(res, 3)
+
+```
+
+
+E.g. Extract entire month of March 2007
+========================================================
+```{r}
+res2 <- matrix_xts['2007-03']
+head(res2, 3)
+tail(res2, 3)
+```
+
+Benchmarking
+========================================================
+Lets create some sample data
+```{r}
+DF <- data.frame(x = rnorm(1e6), index = as.POSIXct('1970-01-01') + 1:1e6)
+
+str(DF)
+
+```
+
+=======
+And equivalent xts data
+```{r}
+XTS <- as.xts(DF$x, order.by=DF$index)
+str(XTS)
+
+```
+
+Let's benchmark
+========
+```{r}
+require(microbenchmark)
+
+microbenchmark(dfres <- DF[DF$index >= as.POSIXct('1970-01-10 00:00:00') & DF$index < as.POSIXct('1970-01-11 00:00:00'),],
+times = 1)
+```
+
+========
+```{r}
+microbenchmark(xtsres <- XTS['1970-01-10'],
+times = 1)
+
+```
+
+Just to make sure data returned is same 
+=======
+```{r}
+head(dfres, 3)
+head(xtsres, 3)
+```
+
+Just to make sure data returned is same 
+=======
+```{r}
+tail(dfres, 3)
+tail(xtsres,3)
+```
+
+
+More subsetting
+========================================================
+E.g. Extract all the data from the beginning through January 7, 2007.
+```{r}
+matrix_xts['/2007-01-07']
+```
+
+More subsetting
+========================================================
+E.g. Extract all the data between specific period
+```{r}
+matrix_xts['2007-01-07/2007-01-18']
+```
+
+first and last functions
+========================================================
+
+```{r}
+## first 1 week of the data
+first(matrix_xts, '1 week')
+```
+
+first and last functions
+========================================================
+
+```{r}
+## last 2 week of data
+last(matrix_xts, '2 weeks')
+```
+
+first and last functions
+========================================================
+
+```{r}
+## first 3 days of the last week of the data.
+first(last(matrix_xts,'1 week'),'3 days')
+```
+
+
+
+
+
+merge : Merging timeseries by matching the indices
+==========
+type : section
+
+
+Let's create some sample data (again!)
+============
+```{r}
+data1 <- xts(1:5, 
+    order.by=Sys.Date()+( 1:5) )
+
+names(data1) <- 'x'
+
+data2 <- xts(101:105, 
+    order.by=Sys.Date()+(-2:2))
+
+names(data2) <- 'y'
+
+```
+...contd
+============
+```{r}
+data1
+data2
+```
+
+
+lets merge
+===========
+```{r}
+merge(data1,data2)
+```
+
+
+cbind works the same as well
+============
+```{r}
+cbind(data1,data2)
+
+```
+
+
+Some interesting functions in xts package
+========================================================
+type: section
+
+Periodicity
+========================================================
+The periodicity function provides a quick summary as to the underlying periodicity of most time-series like objects.
+```{r}
+periodicity(matrix_xts)
+```
+
+Find endpoints by time
+========================================================
+Common use case with timeseries data is to identify the endpoints with respect to time.
+
+```{r}
+endpoints(matrix_xts,on='months')
+endpoints(matrix_xts,on='months', k = 2)
+```
+
+Endpoints continued
+========================================================
+```{r}
+matrix_xts[endpoints(matrix_xts,on='months')]
+
+```
+
+Change periodicity
+========================================================
+One of the most ubiquitous type of data in finance is OHLC data (Open-High-Low-Close). Often is is necessary to change the periodicity of this data to something coarser - e.g. take daily data and aggregate to weekly or monthly.
+```{r}
+to.period(matrix_xts,'months', name ="")
+```
+
+Change periodicity
+========================================================
+Wrapper `to.monthly` changes teh index to something more appropriate
+```{r}
+to.monthly(matrix_xts, name ="")
+
+```
+
+Periodically apply a function
+========================================================
+
+Often it is desirable to be able to calculate a particular statistic, or evaluate a
+function, over a set of non-overlapping time periods.
+
+- period.apply
+- apply.daily
+- apply.monthly
+- apply.quarterly
+- apply.yearly
+
+period.apply example
+========================================================
+```{r}
+period.apply(matrix_xts[,4],
+    INDEX=endpoints(matrix_xts),FUN=max)
+```
+
+========================================================
+Same results can be achieved using `apply.monthly`
+```{r}
+apply.monthly(matrix_xts[,4],FUN=max)
+```
+
+
+Thank you
+=====================
+type : section
+
+Credits go to authors of xts package : 
+
+Jeff Ryan, Joshua Ulrich
+
+
+My contact details : chinmay.patil@gmail.com 
+
+
